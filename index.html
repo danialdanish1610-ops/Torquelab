@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TorqueLab — Interactive Torque Simulator</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#182230;--muted:#667085;--accent:#4f46e5;--line:#e4e7ec;--good:#16a34a;--bad:#dc2626}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(135deg,#111827,#312e81);color:white;padding:28px 18px}
+.wrap{max-width:1100px;margin:auto}
+h1{margin:0 0 6px;font-size:clamp(28px,5vw,46px)}
+header p{margin:0;color:#dbe4ff}
+main{padding:22px 16px 40px}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 8px 28px #1018280d}
+h2{margin:0 0 14px;font-size:20px}
+.sim{min-height:350px;position:relative;overflow:hidden}
+canvas{width:100%;height:320px;display:block;background:linear-gradient(#fbfcff,#f7f8ff);border-radius:14px;border:1px solid var(--line)}
+.controls{display:grid;gap:16px}
+.control label{display:flex;justify-content:space-between;font-weight:700;margin-bottom:7px}
+.value{color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.metric{background:#f8f9ff;border:1px solid #e5e7ff;border-radius:14px;padding:14px}
+.metric small{display:block;color:var(--muted)}
+.metric strong{font-size:25px}
+.formula{font-size:25px;text-align:center;background:#111827;color:white;padding:16px;border-radius:14px;margin:14px 0}
+.explain{background:#f9fafb;border-left:4px solid var(--accent);padding:12px 14px;border-radius:8px;line-height:1.5}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{border:1px solid var(--line);background:white;padding:9px 13px;border-radius:10px;cursor:pointer;font-weight:700}
+.tab.active{background:var(--accent);color:white;border-color:var(--accent)}
+.quiz{display:none}.quiz.active{display:block}
+.q{font-weight:800;font-size:18px}
+.answers{display:grid;gap:8px;margin:14px 0}
+.answer{padding:12px;border:1px solid var(--line);border-radius:10px;background:white;cursor:pointer;text-align:left}
+.answer:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:white;border:0;padding:11px 16px;border-radius:10px;font-weight:800;cursor:pointer}
+.feedback{margin-top:10px;font-weight:700}.correct{color:var(--good)}.wrong{color:var(--bad)}
+.tips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tip{padding:13px;background:#f8fafc;border:1px solid var(--line);border-radius:12px}
+.tip b{display:block;margin-bottom:5px}
+footer{text-align:center;color:var(--muted);padding:10px 0 30px;font-size:13px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.tips{grid-template-columns:1fr}.sim{min-height:300px}canvas{height:280px}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>⚙️ TorqueLab</h1><p>See it. Change it. Understand it.</p></div></header>
+
+<main class="wrap">
+<div class="grid">
+<section class="card sim">
+<h2>1. Interactive Torque Simulator</h2>
+<canvas id="scene" width="900" height="500"></canvas>
+<div class="metrics">
+<div class="metric"><small>Torque</small><strong id="torque">0.00 N·m</strong></div>
+<div class="metric"><small>Rotation</small><strong id="rotation">—</strong></div>
+</div>
+</section>
+
+<section class="card">
+<h2>2. Change the variables</h2>
+<div class="controls">
+<div class="control"><label>Force (F) <span class="value" id="fv">10 N</span></label><input id="force" type="range" min="0" max="30" step="1" value="10"></div>
+<div class="control"><label>Distance (r) <span class="value" id="rv">0.50 m</span></label><input id="distance" type="range" min="0.10" max="1.50" step="0.05" value="0.50"></div>
+<div class="control"><label>Angle (θ) <span class="value" id="av">90°</span></label><input id="angle" type="range" min="0" max="180" step="5" value="90"></div>
+</div>
+<div class="formula">τ = rF sin(θ)</div>
+<div class="explain" id="explain">At 90°, the force produces maximum turning effect for the selected force and distance.</div>
+</section>
+</div>
+
+<section class="card" style="margin-top:18px">
+<h2>3. Learn with “Predict → Test → Explain”</h2>
+<div class="tabs">
+<button class="tab active" data-tab="learn">Quick Tips</button>
+<button class="tab" data-tab="quiz">Challenge</button>
+</div>
+
+<div id="learn" class="quiz active">
+<div class="tips">
+<div class="tip"><b>📍 Pivot</b>Find the point around which the object rotates.</div>
+<div class="tip"><b>↔️ Lever arm</b>Measure the perpendicular distance from the pivot to the force line.</div>
+<div class="tip"><b>💡 Key idea</b>More force or more perpendicular distance generally means more torque.</div>
+</div>
+</div>
+
+<div id="quiz" class="quiz">
+<p class="q" id="question">Question</p>
+<div class="answers" id="answers"></div>
+<button class="primary" id="next">Next Question</button>
+<div id="feedback" class="feedback"></div>
+</div>
+</section>
+</main>
+
+<footer>TorqueLab • Interactive learning tool for physics revision</footer>
+
+<script>
+const force=document.getElementById('force'),distance=document.getElementById('distance'),angle=document.getElementById('angle');
+const fv=document.getElementById('fv'),rv=document.getElementById('rv'),av=document.getElementById('av');
+const torqueEl=document.getElementById('torque'),rotationEl=document.getElementById('rotation'),explain=document.getElementById('explain');
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+
+function calc(){
+ let F=+force.value,r=+distance.value,a=+angle.value;
+ return r*F*Math.sin(a*Math.PI/180);
+}
+
+function draw(){
+ let F=+force.value,r=+distance.value,a=+angle.value,t=calc();
+ fv.textContent=F+' N';
+ rv.textContent=r.toFixed(2)+' m';
+ av.textContent=a+'°';
+ torqueEl.textContent=t.toFixed(2)+' N·m';
+
+ if(a===0||a===180) rotationEl.textContent='No turning effect';
+ else if(a<90) rotationEl.textContent='↺ Counter-clockwise';
+ else rotationEl.textContent='↻ Clockwise';
+
+ if(a===90) explain.textContent='At 90°, sin(θ)=1, so the turning effect is maximum for the selected F and r.';
+ else if(a===0||a===180) explain.textContent='When the force is parallel to the lever, sin(θ)=0, so there is no turning effect.';
+ else explain.textContent='Changing the angle changes the perpendicular component of the force, which changes the torque.';
+
+ const w=canvas.width,h=canvas.height;
+ ctx.clearRect(0,0,w,h);
+
+ const px=150,py=270,len=450*(r/1.5);
+ ctx.save();
+ ctx.translate(px,py);
+
+ ctx.lineWidth=18;
+ ctx.strokeStyle='#4f46e5';
+ ctx.lineCap='round';
+ ctx.beginPath();
+ ctx.moveTo(0,0);
+ ctx.lineTo(len,0);
+ ctx.stroke();
+
+ ctx.fillStyle='#111827';
+ ctx.beginPath();
+ ctx.arc(0,0,18,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle='#fff';
+ ctx.font='bold 15px system-ui';
+ ctx.textAlign='center';
+ ctx.fillText('P',0,5);
+
+ ctx.strokeStyle='#64748b';
+ ctx.lineWidth=2;
+ ctx.setLineDash([6,5]);
+ ctx.beginPath();
+ ctx.moveTo(0,38);
+ ctx.lineTo(len,38);
+ ctx.stroke();
+ ctx.setLineDash([]);
+
+ ctx.fillStyle='#475467';
+ ctx.font='16px system-ui';
+ ctx.textAlign='center';
+ ctx.fillText('r = '+r.toFixed(2)+' m',len/2,65);
+
+ const rad=-a*Math.PI/180;
+ ctx.strokeStyle='#dc2626';
+ ctx.fillStyle='#dc2626';
+ ctx.lineWidth=7;
+ ctx.beginPath();
+ ctx.moveTo(len,0);
+ ctx.lineTo(len+90*Math.cos(rad),90*Math.sin(rad));
+ ctx.stroke();
+
+ const ex=len+90*Math.cos(rad),ey=90*Math.sin(rad);
+ ctx.beginPath();
+ ctx.moveTo(ex,ey);
+ ctx.lineTo(ex-18*Math.cos(rad-0.5),ey-18*Math.sin(rad-0.5));
+ ctx.lineTo(ex-18*Math.cos(rad+0.5),ey-18*Math.sin(rad+0.5));
+ ctx.closePath();
+ ctx.fill();
+
+ ctx.font='bold 18px system-ui';
+ ctx.textAlign='left';
+ ctx.fillText('F = '+F+' N',len+25,90*Math.sin(rad)-10);
+
+ ctx.restore();
+}
+
+[force,distance,angle].forEach(x=>x.addEventListener('input',draw));
+draw();
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+ b.classList.add('active');
+ document.querySelectorAll('.quiz').forEach(x=>x.classList.remove('active'));
+ document.getElementById(b.dataset.tab).classList.add('active');
+}));
+
+const qs=[
+ {q:'If force stays constant and the lever arm increases, what happens to torque?',a:['It increases','It decreases','It becomes zero'],c:0},
+ {q:'At which angle is torque maximum for fixed F and r?',a:['0°','45°','90°'],c:2},
+ {q:'What is the SI unit of torque?',a:['Newton','Joule','Newton-metre'],c:2},
+ {q:'If the force acts directly along the lever (0°), what is the torque?',a:['Maximum','Zero','Negative always'],c:1}
+];
+
+let qi=0;
+
+function loadQ(){
+ let q=qs[qi];
+ document.getElementById('question').textContent=q.q;
+ let box=document.getElementById('answers');
+ box.innerHTML='';
+ let feedback=document.getElementById('feedback');
+ feedback.textContent='';
+ feedback.className='feedback';
+
+ q.a.forEach((x,i)=>{
+  let b=document.createElement('button');
+  b.className='answer';
+  b.textContent=x;
+  b.onclick=()=>{
+   feedback.textContent=i===q.c?'✅ Correct!':'❌ Not quite. Review the simulator and try again.';
+   feedback.className='feedback '+(i===q.c?'correct':'wrong');
+  };
+  box.appendChild(b);
+ });
+}
+
+document.getElementById('next').onclick=()=>{
+ qi=(qi+1)%qs.length;
+ loadQ();
+};
+
+loadQ();
+</script>
+</body>
+</html>
